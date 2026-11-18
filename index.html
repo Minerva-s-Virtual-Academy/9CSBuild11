@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Weakest Link: Cyber Threat Simulator</title>
+    <style>
+        /* Self-contained design tokens & responsive styling matching Canvas LMS palette */
+        :root {
+            --primary: #007BA6;
+            --primary-dark: #005f80;
+            --accent: #00796B;
+            --accent-light: #e0f2f1;
+            --danger: #c62828;
+            --danger-light: #ffebee;
+            --warn: #d97706;
+            --warn-light: #fef3c7;
+            --bg-soft: #eef7fa;
+            --surface: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #475569;
+            --border: #cbd5e1;
+            --radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-soft);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 12px;
+            overflow-x: hidden;
+        }
+
+        .app-shell {
+            max-width: 920px;
+            margin: 0 auto;
+        }
+
+        /* Header Bar */
+        .top-bar {
+            background: var(--surface);
+            border-bottom: 4px solid var(--primary);
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            margin-bottom: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            box-shadow: 0 2px 6px rgba(0, 123, 166, 0.08);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            background: var(--primary);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .brand h1 {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1.2;
+        }
+
+        .brand p {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .hud-stats {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-soft);
+            padding: 8px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 123, 166, 0.2);
+        }
+
+        .hud-item {
+            text-align: center;
+        }
+
+        .hud-label {
+            display: block;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+        }
+
+        .hud-val {
+            font-size: 0.9rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .hud-val.score {
+            color: var(--accent);
+        }
+
+        .hud-val.streak {
+            color: var(--warn);
+        }
+
+        .hud-divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(0, 123, 166, 0.2);
+        }
+
+        /* Main Card Container */
+        .main-card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            border: 1px solid #dbe7ec;
+            padding: 18px 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Animations */
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-in {
+            animation: fadeSlide 0.28s ease-out forwards;
+        }
+
+        @keyframes pulseDanger {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(198, 40, 40, 0.55); }
+            50% { box-shadow: 0 0 0 8px rgba(198, 40, 40, 0); }
+        }
+
+        @keyframes flowPacket {
+            0% { stroke-dashoffset: 24; }
+            100% { stroke-dashoffset: 0; }
+        }
+
+        .flow-line {
+            stroke-dasharray: 6 6;
+            animation: flowPacket 0.8s linear infinite;
+        }
+
+        /* Typography & Badges */
+        .stage-header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .stage-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .badge-blue { background: var(--bg-soft); color: var(--primary); border: 1px solid rgba(0,123,166,0.25); }
+        .badge-teal { background: var(--accent-light); color: var(--accent); }
+        .badge-red { background: var(--danger-light); color: var(--danger); }
+        .badge-amber { background: var(--warn-light); color: #b45309; }
+
+        .progress-track {
+            width: 100%;
+            height: 7px;
+            background: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: width 0.35s ease;
+        }
+
+        /* Intro Grid */
+        .callout-box {
+            background: var(--bg-soft);
+            border-left: 4px solid var(--primary);
+            padding: 14px 16px;
+            border-radius: 0 10px 10px 0;
+            margin-bottom: 16px;
+        }
+
+        .callout-box h2 {
+            font-size: 1.05rem;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .callout-box p {
+            font-size: 0.9rem;
+            color: var(--text-main);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+        }
+
+        @media (max-width: 700px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .phase-card {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            background: #f8fafc;
+        }
+
+        .phase-card h3 {
+            font-size: 0.95rem;
+            margin: 6px 0 4px;
+            color: var(--text-main);
+        }
+
+        .phase-card p {
+            font-size: 0.83rem;
+            color: var(--text-muted);
+        }
+
+        /* Evidence Mockups (Phase 1) */
+        .evidence-card {
+            border: 2px solid #cbd5e1;
+            border-radius: 10px;
+            background: #f8fafc;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .evidence-topbar {
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 8px 14px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .evidence-dots {
+            display: flex;
+            gap: 5px;
+        }
+
+        .dot { width: 9px; height: 9px; border-radius: 50%; }
+        .dot-r { background: #ef4444; }
+        .dot-y { background: #f59e0b; }
+        .dot-g { background: #10b981; }
+
+        .evidence-body {
+            padding: 14px 16px;
+            font-size: 0.88rem;
+        }
+
+        .mock-email {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .mock-meta {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+        }
+
+        .mock-attachment {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: var(--danger-light);
+            border: 1px dashed var(--danger);
+            color: var(--danger);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .mock-wifi-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .wifi-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            font-size: 0.83rem;
+        }
+
+        .wifi-row.selected {
+            border: 2px solid var(--warn);
+            background: #fffbeb;
+            font-weight: 700;
+        }
+
+        .mock-terminal {
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: monospace;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+
+        /* Interactive Two-Step Question Area */
+        .step-box {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px;
+            background: #ffffff;
+            margin-bottom: 12px;
+        }
+
+        .step-label {
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--primary);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .options-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .opt-btn {
+            width: 100%;
+            text-align: left;
+            padding: 11px 14px;
+            border-radius: 9px;
+            border: 2px solid #e2e8f0;
+            background: #fff;
+            color: var(--text-main);
+            font-size: 0.86rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.16s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .opt-btn:hover:not(:disabled) {
+            border-color: var(--primary);
+            background: var(--bg-soft);
+        }
+
+        .opt-btn:disabled {
+            cursor: default;
+        }
+
+        .opt-btn.correct {
+            border-color: var(--accent);
+            background: var(--accent-light);
+            color: #004d40;
+        }
+
+        .opt-btn.wrong {
+            border-color: var(--danger);
+            background: var(--danger-light);
+            color: #7f1d1d;
+        }
+
+        /* Animated Topology Diagram */
+        .topology-panel {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+
+        .topology-title {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 8px;
+            letter-spacing: 0.04em;
+        }
+
+        .hw-nodes {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        @media (max-width: 640px) {
+            .hw-nodes {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .hw-node {
+            background: #fff;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 8px 6px;
+            text-align: center;
+            font-size: 0.75rem;
+            position: relative;
+        }
+
+        .hw-node.compromised {
+            border-color: var(--danger);
+            background: var(--danger-light);
+            color: #7f1d1d;
+            animation: pulseDanger 1.5s infinite;
+        }
+
+        .hw-node.origin {
+            border-color: var(--warn);
+            background: var(--warn-light);
+            color: #78350f;
+        }
+
+        .hw-icon {
+            font-size: 1.25rem;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .hw-name {
+            font-weight: 800;
+            display: block;
+            line-height: 1.2;
+        }
+
+        .hw-tag {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+
+        /* Feedback Banner */
+        .feedback-box {
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            border: 2px solid var(--accent);
+            background: var(--accent-light);
+            color: #003d33;
+        }
+
+        .feedback-box.warn-fb {
+            border-color: var(--warn);
+            background: var(--warn-light);
+            color: #78350f;
+        }
+
+        .feedback-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            font-weight: 800;
+            font-size: 0.95rem;
+        }
+
+        .feedback-text {
+            font-size: 0.86rem;
+            margin-bottom: 12px;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 11px 20px;
+            border-radius: 9px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.16s ease, transform 0.1s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 11px 20px;
+            border-radius: 9px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: #005c51;
+        }
+
+        /* Phase 2: Rapid Triage Controls */
+        .triage-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            background: #f8fafc;
+            padding: 10px 14px;
+            border-radius: 9px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 14px;
+        }
+
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-main);
+            cursor: pointer;
+        }
+
+        .timer-pill {
+            font-family: monospace;
+            font-size: 0.9rem;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: var(--bg-soft);
+            color: var(--primary);
+            border: 1px solid rgba(0,123,166,0.3);
+        }
+
+        .timer-pill.urgent {
+            background: var(--danger-light);
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        @media (max-width: 560px) {
+            .category-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .cat-btn {
+            padding: 14px;
+            border-radius: 10px;
+            border: 2px solid #cbd5e1;
+            background: #fff;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .cat-btn:hover:not(:disabled) {
+            border-color: var(--primary);
+            background: var(--bg-soft);
+        }
+
+        .cat-title {
+            display: block;
+            font-weight: 800;
+            font-size: 0.9rem;
+            color: var(--primary);
+            margin-bottom: 2px;
+        }
+
+        .cat-sub {
+            display: block;
+            font-size: 0.76rem;
+            color: var(--text-muted);
+        }
+
+        /* Certificate Summary */
+        .cert-box {
+            border: 2px solid var(--primary);
+            border-radius: 14px;
+            background: linear-gradient(180deg, var(--bg-soft) 0%, #ffffff 100%);
+            padding: 22px 18px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .cert-medal {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            box-shadow: 0 4px 10px rgba(0, 121, 107, 0.25);
+        }
+
+        .cert-rank {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin: 4px 0 6px;
+        }
+
+        .stats-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 16px auto;
+            max-width: 680px;
+        }
+
+        @media (max-width: 600px) {
+            .stats-4 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .stat-tile {
+            background: #fff;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 10px 8px;
+        }
+
+        .stat-tile span {
+            display: block;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .stat-tile strong {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--accent);
+        }
+
+        .copy-toast {
+            display: inline-block;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--accent);
+            background: var(--accent-light);
+            padding: 4px 12px;
+            border-radius: 999px;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <!-- Top Status Bar -->
+        <header class="top-bar">
+            <div class="brand">
+                <div class="brand-icon" aria-hidden="true">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        <path d="M12 8v4"></path>
+                        <path d="M12 16h.01"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1>The Weakest Link: Cyber Threat Simulator</h1>
+                    <p>Oakridge Academy Ethical Hacking &amp; Threat Audit</p>
+                </div>
+            </div>
+
+            <div class="hud-stats">
+                <div class="hud-item">
+                    <span class="hud-label">Audit Phase</span>
+                    <span id="hud-phase" class="hud-val">Briefing</span>
+                </div>
+                <div class="hud-divider"></div>
+                <div class="hud-item">
+                    <span class="hud-label">Streak</span>
+                    <span id="hud-streak" class="hud-val streak">0 🔥</span>
+                </div>
+                <div class="hud-divider"></div>
+                <div class="hud-item">
+                    <span class="hud-label">Score</span>
+                    <span id="hud-score" class="hud-val score">0 pts</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dynamic Simulation Stage -->
+        <main id="app-root" class="main-card"></main>
+
+        <footer class="footer-note">
+            KS3 Computing • Network Security Threats &amp; The Human Factor • British English Edition
+        </footer>
+    </div>
+
+    <script>
+        /**
+         * The Weakest Link: Cyber Threat Simulator
+         * Self-contained interactive audit for 13-year-old UK students.
+         * Focuses exclusively on network threats and how human behaviour creates entry points.
+         */
+
+        const state = {
+            view: 'intro', // 'intro', 'phase1', 'phase2', 'summary'
+            score: 0,
+            streak: 0,
+            maxStreak: 0,
+            phase1Score: 0,
+            phase2Score: 0,
+            // Phase 1 state
+            scenarioIdx: 0,
+            mistakeSelected: null,
+            mistakeCorrect: false,
+            threatSelected: null,
+            threatCorrect: false,
+            // Phase 2 state
+            triageIdx: 0,
+            triageAnswered: false,
+            timerEnabled: true,
+            timeLeft: 15,
+            timerInterval: null
+        };
+
+        // --- PHASE 1: 6 REALISTIC UK SCHOOL & STUDENT BREACH SCENARIOS ---
+        const breachScenarios = [
+            {
+                id: 'usb-drop',
+                title: 'Incident #1: The Car Park USB Stick',
+                evidenceHeader: 'Physical Security Log — IT Lab 3 (08:50 AM)',
+                evidenceHtml: `
+                    <div class="mock-email">
+                        <div class="mock-meta"><strong>Device Event:</strong> Removable USB Drive inserted into <code>LAB3-PC-09</code></div>
+                        <p>Year 9 pupil Leo found a silver USB flash drive labelled <strong>"Year_9_Exam_Answers_2026"</strong> near the school bike sheds. Curious to see what was on it, he plugged it straight into his classroom desktop PC.</p>
+                        <div class="mock-attachment">⚠️ AutoRun Executed: payload_dropper.exe → Scanning LAN Shares...</div>
+                    </div>
+                `,
+                mistakePrompt: 'Step A: Identify the Human Mistake',
+                mistakes: [
+                    { text: 'Plugging an unknown removable USB drive into a networked school PC', correct: true },
+                    { text: 'Sitting too close to the classroom window while typing', correct: false },
+                    { text: 'Forgetting to turn off the monitor at the end of the lesson', correct: false }
+                ],
+                threatPrompt: 'Step B: Identify the Resulting Network Threat',
+                threats: [
+                    { text: 'Malware (Trojan / Worm) spreading across the school LAN', correct: true },
+                    { text: 'Denial of Service (DoS) traffic flood from the internet', correct: false },
+                    { text: 'Shoulder surfing by someone standing outside', correct: false }
+                ],
+                topology: [
+                    { icon: '💾', name: 'Found USB Stick', tag: 'Human Entry', status: 'origin' },
+                    { icon: '💻', name: 'Lab Workstation', tag: 'Infected', status: 'compromised' },
+                    { icon: '🔀', name: 'LAN Switch', tag: 'Spreading Traffic', status: 'compromised' },
+                    { icon: '🗄️', name: 'School File Server', tag: 'At Risk!', status: 'compromised' }
+                ],
+                explanation: 'Criminals deliberately drop infected USB drives in public places ("baiting"). Once plugged into a single workstation, hidden Trojan malware uses the classroom Network Switch to spread rapidly across the Local Area Network (LAN) to shared servers.'
+            },
+            {
+                id: 'phishing-ransom',
+                title: 'Incident #2: The Urgent Staffroom Attachment',
+                evidenceHeader: 'Inbox — Oakridge Staff Mail Client',
+                evidenceHtml: `
+                    <div class="mock-email">
+                        <div class="mock-meta">
+                            <strong>From:</strong> Headteachers-Office &lt;admin@oakridge-schoo1-uk.com&gt;<br>
+                            <strong>Subject:</strong> URGENT: Updated Ofsted Timetable — Open Immediately!
+                        </div>
+                        <p>Please review the attached timetable changes before 9:00 AM assembly today or your classes will be reassigned.</p>
+                        <div class="mock-attachment">📎 Ofsted_Timetable_Update.docm (Macros Enabled)</div>
+                    </div>
+                `,
+                mistakePrompt: 'Step A: Identify the Human Mistake',
+                mistakes: [
+                    { text: 'Falling for phishing urgency and opening an attachment from a fake lookalike domain', correct: true },
+                    { text: 'Connecting a desktop PC to the switch with an Ethernet cable', correct: false },
+                    { text: 'Using a wireless mouse with low batteries', correct: false }
+                ],
+                threatPrompt: 'Step B: Identify the Resulting Network Threat',
+                threats: [
+                    { text: 'Ransomware encrypting shared files across the school server', correct: true },
+                    { text: 'Brute-force password guessing against the router', correct: false },
+                    { text: 'Signal interference from nearby microwave ovens', correct: false }
+                ],
+                topology: [
+                    { icon: '🌐', name: 'Fake Email (WAN)', tag: 'Phishing Lure', status: 'origin' },
+                    { icon: '🛡️', name: 'Edge Router', tag: 'Allowed Mail', status: 'normal' },
+                    { icon: '💻', name: 'Staff Workstation', tag: 'Macro Executed', status: 'compromised' },
+                    { icon: '🗄️', name: 'Shared File Server', tag: 'Files Encrypted!', status: 'compromised' }
+                ],
+                explanation: 'Notice the spoofed address ("schoo1" with a number 1 instead of an L). Social engineering tricks a rushed human into enabling malicious macros, unleashing Ransomware that scrambles files across the school server and demands payment.'
+            },
+            {
+                id: 'public-wifi',
+                title: 'Incident #3: Revision at the Train Station Café',
+                evidenceHeader: 'Student Laptop — Wi-Fi Network Selection',
+                evidenceHtml: `
+                    <div class="mock-wifi-list">
+                        <div class="wifi-row">
+                            <span>🔒 Station_Commuter_Secure (WPA3 Encrypted)</span>
+                            <span class="badge badge-teal">Password Required</span>
+                        </div>
+                        <div class="wifi-row selected">
+                            <span>⚠️ FREE_CAFE_WIFI_NO_PASSWORD (Unsecured / Open)</span>
+                            <span class="badge badge-amber">Connected ✓</span>
+                        </div>
+                    </div>
+                    <p style="margin-top:8px; font-size:0.82rem; color:#475569;">Maya connected to the open hotspot and logged into an older homework portal using unencrypted <strong>HTTP</strong>.</p>
+                `,
+                mistakePrompt: 'Step A: Identify the Human Mistake',
+                mistakes: [
+                    { text: 'Logging into accounts over an unencrypted public Wi-Fi hotspot', correct: true },
+                    { text: 'Saving homework as a PDF document instead of a Word file', correct: false },
+                    { text: 'Lowering the laptop screen brightness to save battery', correct: false }
+                ],
+                threatPrompt: 'Step B: Identify the Resulting Network Threat',
+                threats: [
+                    { text: 'Data Interception (Packet Sniffing) of login details in plain text', correct: true },
+                    { text: 'A worm spreading via a USB flash drive', correct: false },
+                    { text: 'Physical theft of the school\'s core network switch', correct: false }
+                ],
+                topology: [
+                    { icon: '💻', name: 'Student Laptop', tag: 'Sending Plain Text', status: 'origin' },
+                    { icon: '📡', name: 'Rogue Wi-Fi Hotspot', tag: 'Sniffing Packets', status: 'compromised' },
+                    { icon: '🕵️', name: 'Attacker Nearby', tag: 'Captures Password!', status: 'compromised' },
+                    { icon: '🌐', name: 'Homework Portal', tag: 'Account Breached', status: 'compromised' }
+                ],
+                explanation: 'On an open, unencrypted wireless network, radio waves travel through the air for anyone nearby to capture. Using packet-sniffing software, an attacker performs Data Interception and reads Maya\'s username and password in plain text.'
+            },
+            {
+                id: 'password-reuse',
+                title: 'Incident #4: The Leaked Gaming Forum Password',
+                evidenceHeader: 'Dark Web Credential Dump & School Login Logs',
+                evidenceHtml: `
+                    <div class="mock-terminal">
+                        [LEAKED DATABASE: PixelCraft_Fan_Forum_2026]<br>
+                        user: sam.taylor@oakridge.sch.uk | pass: <span style="color:#fbbf24;">Liverpool2013!</span><br><br>
+                        [OAKRIDGE REMOTE PORTAL LOG]<br>
+                        02:14:01 - Login attempt: sam.taylor (Failed)<br>
+                        02:14:02 - Login attempt: sam.taylor with <span style="color:#34d399;">Liverpool2013!</span> (SUCCESS)
+                    </div>
+                `,
+                mistakePrompt: 'Step A: Identify the Human Mistake',
+                mistakes: [
+                    { text: 'Reusing the exact same predictable password across a gaming site and school account', correct: true },
+                    { text: 'Logging out of the school portal after finishing homework', correct: false },
+                    { text: 'Using a wired Ethernet connection at home', correct: false }
+                ],
+                threatPrompt: 'Step B: Identify the Resulting Network Threat',
+                threats: [
+                    { text: 'Brute-Force / Credential Stuffing attack gaining unauthorised network access', correct: true },
+                    { text: 'Denial of Service (DoS) crashing the local printer', correct: false },
+                    { text: 'Ransomware arriving on a DVD disc', correct: false }
+                ],
+                topology: [
+                    { icon: '🌐', name: 'Automated Bot (WAN)', tag: 'Testing Passwords', status: 'origin' },
+                    { icon: '🛡️', name: 'School Router', tag: 'Valid Login Seen', status: 'normal' },
+                    { icon: '🗄️', name: 'Authentication Server', tag: 'Access Granted!', status: 'compromised' },
+                    { icon: '📂', name: 'Student Cloud Files', tag: 'Data Stolen', status: 'compromised' }
+                ],
+                explanation: 'When a gaming website gets hacked, criminals use automated scripts to test those leaked email-and-password pairs on other networks (a variation of a Brute-Force attack called credential stuffing). Reusing passwords lets one leak compromise your entire school account.'
+            },
+            {
+                id: 'unlocked-pc',
+                title: 'Incident #5: Breaktime in the Computing Room',
+                evidenceHeader: 'Classroom Security Audit — Room C4 (11:05 AM)',
+                evidenceHtml: `
+                    <div class="mock-email">
+                        <div class="mock-meta"><strong>Workstation:</strong> <code>C4-TEACHER-DESK</code> | <strong>Status:</strong> Unlocked &amp; Logged In</div>
+                        <p>The cover teacher popped next door to collect printing for 3 minutes without locking their computer screen. A pupil slipped behind the desk and installed a tiny background program before the bell rang.</p>
+                        <div class="mock-attachment">👁️ Background Process Started: keylogger_silent.dll</div>
+                    </div>
+                `,
+                mistakePrompt: 'Step A: Identify the Human Mistake',
+                mistakes: [
+                    { text: 'Walking away from an active workstation without locking the screen (Win + L)', correct: true },
+                    { text: 'Writing lesson notes on a paper whiteboard', correct: false },
+                    { text: 'Connecting a projector via an HDMI cable', correct: false }
+                ],
+                threatPrompt: 'Step B: Identify the Resulting Network Threat',
+                threats: [
+                    { text: 'Spyware (Keylogger) secretly recording future staff passwords & sensitive data', correct: true },
+                    { text: 'A distributed Denial of Service flood from overseas', correct: false },
+                    { text: 'Data interception across a train station Wi-Fi network', correct: false }
+                ],
+                topology: [
+                    { icon: '🚶', name: 'Physical Insider', tag: '3-Min Window', status: 'origin' },
+                    { icon: '💻', name: 'Unlocked Teacher PC', tag: 'Spyware Installed', status: 'compromised' },
+                    { icon: '🔀', name: 'LAN Switch', tag: 'Steals Admin Login', status: 'compromised' },
+                    { icon: '🗄️', name: 'School MIS Database', tag: 'Records Exposed!', status: 'compromised' }
+                ],
+                explanation: 'Even the strongest firewall on the internet cannot stop an insider threat if a human leaves a logged-in computer unattended! Installing Spyware (such as a keylogger) secretly records every keystroke, capturing administrator passwords later.'
+            },
+            {
+                id: 'router-photo',
+                title: 'Incident #6: The "New Wi-Fi Flex" Social Post',
+                evidenceHeader: 'Public Social Media Story — @Jake_UK_09',
+                evidenceHtml: `
+                    <div class="mock-email">
+                        <div class="mock-meta"><strong>Public Post:</strong> Photo of a brand-new home wireless router box</div>
+                        <p>Caption: <em>"Finally got superfast fibre installed!! No more lag 🔥"</em></p>
+                        <p style="margin-top:6px; font-size:0.82rem;">Clearly visible on the back sticker of the router in the photo:<br>
+                        <code>SSID: HyperNet-8842 | Wi-Fi Key: xK9#mP2v | Admin Login: admin / default123</code></p>
+                    </div>
+                `,
+                mistakePrompt: 'Step A: Identify the Human Mistake',
+                mistakes: [
+                    { text: 'Oversharing sensitive router credentials publicly online & keeping default passwords', correct: true },
+                    { text: 'Placing the router on a shelf away from thick brick walls', correct: false },
+                    { text: 'Connecting a games console using a network cable', correct: false }
+                ],
+                threatPrompt: 'Step B: Identify the Resulting Network Threat',
+                threats: [
+                    { text: 'Unauthorised network access & router hijacking by local attackers', correct: true },
+                    { text: 'Malware arriving through a corrupted floppy disk', correct: false },
+                    { text: 'Static electricity damaging the Ethernet port', correct: false }
+                ],
+                topology: [
+                    { icon: '📱', name: 'Public Social Post', tag: 'Leaks Router Key', status: 'origin' },
+                    { icon: '📡', name: 'Home Wireless Router', tag: 'Admin Hijacked!', status: 'compromised' },
+                    { icon: '💻', name: 'Family Devices (LAN)', tag: 'Traffic Monitored', status: 'compromised' },
+                    { icon: '🌐', name: 'Internet Connection', tag: 'Used for Crime', status: 'compromised' }
+                ],
+                explanation: 'Oversharing information online (a classic social engineering and blagging goldmine) hands attackers the keys to your network. With the router\'s admin password, an attacker can take over the hardware, spy on connected devices, or redirect family web traffic.'
+            }
+        ];
+
+        // --- PHASE 2: 5 RAPID TRIAGE ALERTS ---
+        const triageAlerts = [
+            {
+                alert: 'A caller claims to be from "Microsoft Support" and convinces a student to read out their school password over the phone.',
+                category: 'Social Engineering',
+                reason: 'This relies purely on human manipulation and pretexting rather than technical software exploits.'
+            },
+            {
+                alert: 'An automated script tries 10,000 common passwords per minute against a school remote login page until it finds a match.',
+                category: 'Weak Credentials / Brute-Force',
+                reason: 'Systematic trial-and-error password guessing is a classic Brute-Force attack.'
+            },
+            {
+                alert: 'A hacker sits in a coffee shop running packet-sniffing software to capture unencrypted data travelling over free public Wi-Fi.',
+                category: 'Data Interception',
+                reason: 'Eavesdropping on unencrypted data packets travelling across a network is Data Interception.'
+            },
+            {
+                alert: 'A student downloads a "free game cheat" file that secretly locks every document on the PC and demands £200 in Bitcoin.',
+                category: 'Malware Delivery',
+                reason: 'Ransomware is a type of malicious software (malware) disguised inside a Trojan download.'
+            },
+            {
+                alert: 'While a pupil looks away at their friend\'s screen, someone behind them watches them type their 6-digit PIN.',
+                category: 'Social Engineering',
+                reason: 'Shoulder surfing exploits human inattention in physical spaces to steal login details.'
+            }
+        ];
+
+        const triageCategories = [
+            { id: 'Social Engineering', sub: 'Tricking or watching humans (phishing, blagging, shoulder surfing)' },
+            { id: 'Weak Credentials / Brute-Force', sub: 'Cracking or reusing weak passwords through rapid guessing' },
+            { id: 'Data Interception', sub: 'Sniffing unencrypted data packets over Wi-Fi or networks' },
+            { id: 'Malware Delivery', sub: 'Trojans, viruses, spyware, and ransomware payloads' }
+        ];
+
+        // --- HUD & SCORING HELPERS ---
+        function updateHUD() {
+            const phaseLabels = {
+                intro: 'Mission Briefing',
+                phase1: 'Phase 1: Breach Lab',
+                phase2: 'Phase 2: Rapid Triage',
+                summary: 'Audit Complete'
+            };
+            document.getElementById('hud-phase').textContent = phaseLabels[state.view];
+            document.getElementById('hud-score').textContent = `${state.score} pts`;
+            document.getElementById('hud-streak').textContent = `${state.streak} 🔥`;
+        }
+
+        function awardPoints(basePoints, phaseKey) {
+            state.streak += 1;
+            if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+            const bonus = state.streak >= 3 ? 25 : 0;
+            const total = basePoints + bonus;
+            state.score += total;
+            if (phaseKey === 'phase1') state.phase1Score += total;
+            if (phaseKey === 'phase2') state.phase2Score += total;
+            updateHUD();
+            return { total, bonus };
+        }
+
+        function breakStreak() {
+            state.streak = 0;
+            updateHUD();
+        }
+
+        function clearTriageTimer() {
+            if (state.timerInterval) {
+                clearInterval(state.timerInterval);
+                state.timerInterval = null;
+            }
+        }
+
+        // --- MAIN RENDER CONTROLLER ---
+        function render() {
+            clearTriageTimer();
+            updateHUD();
+            const root = document.getElementById('app-root');
+
+            if (state.view === 'intro') renderIntro(root);
+            else if (state.view === 'phase1') renderPhase1(root);
+            else if (state.view === 'phase2') renderPhase2(root);
+            else if (state.view === 'summary') renderSummary(root);
+        }
+
+        // --- VIEW 1: INTRO BRIEFING ---
+        function renderIntro(root) {
+            root.innerHTML = `
+                <div class="animate-in">
+                    <div class="callout-box">
+                        <h2>Why Are Humans Called "The Weakest Link" in Cyber Security?</h2>
+                        <p>
+                            A school network can have expensive <strong>routers</strong>, <strong>switches</strong>, and <strong>firewalls</strong>—yet a single human mistake (like plugging in a lost USB stick or clicking an urgent email) can open the door to devastating technical attacks. Today, you are running an ethical threat audit on <strong>Oakridge Academy</strong>.
+                        </p>
+                    </div>
+
+                    <div class="grid-2" style="margin-bottom: 18px;">
+                        <div class="phase-card">
+                            <span class="badge badge-blue">Phase 1 • 6 Real Scenarios</span>
+                            <h3>Anatomy of a Breach</h3>
+                            <p>Inspect real evidence from our school LAN and student devices. Spot <strong>the human mistake</strong>, identify <strong>the resulting network threat</strong>, and trace how it spreads across our hardware.</p>
+                        </div>
+                        <div class="phase-card">
+                            <span class="badge badge-teal">Phase 2 • 5 Quick Alerts</span>
+                            <h3>"Spot the Weak Link" Triage</h3>
+                            <p>Classify fast-paced security alerts into Social Engineering, Brute-Force, Data Interception, or Malware Delivery. Includes an optional stress-free timer toggle!</p>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding-top:12px; border-top:1px solid #e2e8f0;">
+                        <span style="font-size:0.82rem; font-weight:700; color:var(--accent);">
+                            🔥 Tip: Chain 3+ correct answers in a row for +25 streak bonus points!
+                        </span>
+                        <button class="btn-primary" onclick="startPhase1()">
+                            <span>Start Phase 1: Threat Lab</span>
+                            <span aria-hidden="true">→</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function startPhase1() {
+            state.view = 'phase1';
+            state.scenarioIdx = 0;
+            resetScenarioStepState();
+            render();
+        }
+
+        function resetScenarioStepState() {
+            state.mistakeSelected = null;
+            state.mistakeCorrect = false;
+            state.threatSelected = null;
+            state.threatCorrect = false;
+        }
+
+        // --- VIEW 2: PHASE 1 (ANATOMY OF A BREACH) ---
+        function renderPhase1(root) {
+            const sc = breachScenarios[state.scenarioIdx];
+            const progress = Math.round((state.scenarioIdx / breachScenarios.length) * 100);
+            const bothSolved = state.mistakeCorrect && state.threatCorrect;
+
+            root.innerHTML = `
+                <div class="animate-in">
+                    <div class="stage-header">
+                        <div>
+                            <h2 class="stage-title">${sc.title}</h2>
+                            <p style="font-size:0.82rem; color:var(--text-muted);">Examine the evidence below and connect the human behaviour to the network threat.</p>
+                        </div>
+                        <span class="badge badge-blue">Scenario ${state.scenarioIdx + 1} of ${breachScenarios.length}</span>
+                    </div>
+
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width:${progress}%"></div>
+                    </div>
+
+                    <!-- Simulated Evidence Card -->
+                    <div class="evidence-card">
+                        <div class="evidence-topbar">
+                            <span>🔍 ${sc.evidenceHeader}</span>
+                            <div class="evidence-dots">
+                                <span class="dot dot-r"></span>
+                                <span class="dot dot-y"></span>
+                                <span class="dot dot-g"></span>
+                            </div>
+                        </div>
+                        <div class="evidence-body">
+                            ${sc.evidenceHtml}
+                        </div>
+                    </div>
+
+                    <!-- Two-Column Interactive Diagnosis -->
+                    <div class="grid-2">
+                        <!-- Step A: Human Mistake -->
+                        <div class="step-box">
+                            <span class="step-label">1. ${sc.mistakePrompt}</span>
+                            <div class="options-stack">
+                                ${sc.mistakes.map((m, idx) => {
+                                    let cls = 'opt-btn';
+                                    let icon = '';
+                                    if (state.mistakeSelected === idx) {
+                                        cls += m.correct ? ' correct' : ' wrong';
+                                        icon = m.correct ? '✓' : '✕';
+                                    } else if (state.mistakeCorrect && m.correct) {
+                                        cls += ' correct';
+                                        icon = '✓';
+                                    }
+                                    return `
+                                        <button class="${cls}" ${state.mistakeCorrect ? 'disabled' : ''} onclick="chooseMistake(${idx})">
+                                            <span>${m.text}</span>
+                                            <strong>${icon}</strong>
+                                        </button>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <!-- Step B: Technical Network Threat -->
+                        <div class="step-box">
+                            <span class="step-label">2. ${sc.threatPrompt}</span>
+                            <div class="options-stack">
+                                ${sc.threats.map((t, idx) => {
+                                    let cls = 'opt-btn';
+                                    let icon = '';
+                                    if (state.threatSelected === idx) {
+                                        cls += t.correct ? ' correct' : ' wrong';
+                                        icon = t.correct ? '✓' : '✕';
+                                    } else if (state.threatCorrect && t.correct) {
+                                        cls += ' correct';
+                                        icon = '✓';
+                                    }
+                                    return `
+                                        <button class="${cls}" ${state.threatCorrect ? 'disabled' : ''} onclick="chooseThreat(${idx})">
+                                            <span>${t.text}</span>
+                                            <strong>${icon}</strong>
+                                        </button>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Immediate Hint if wrong choice clicked -->
+                    ${(!bothSolved && ((state.mistakeSelected !== null && !state.mistakeCorrect) || (state.threatSelected !== null && !state.threatCorrect))) ? `
+                        <div class="feedback-box warn-fb animate-in">
+                            <div class="feedback-header">
+                                <span>⚠️ Not quite — check the evidence clue again!</span>
+                            </div>
+                            <p class="feedback-text" style="margin-bottom:0;">Look closely at what the person physically or digitally did, and how that impacts the connected network hardware.</p>
+                        </div>
+                    ` : ''}
+
+                    <!-- Complete Breach Analysis + Animated Hardware Topology Map -->
+                    ${bothSolved ? `
+                        <div class="feedback-box animate-in">
+                            <div class="feedback-header">
+                                <span>✅ Breach Chain Mapped!</span>
+                                <span class="badge badge-teal">Hardware Path Exposed</span>
+                            </div>
+                            <p class="feedback-text">${sc.explanation}</p>
+
+                            <div class="topology-panel">
+                                <div class="topology-title">Simulated Threat Propagation Across Network Hardware</div>
+                                <div class="hw-nodes">
+                                    ${sc.topology.map(node => `
+                                        <div class="hw-node ${node.status === 'origin' ? 'origin' : node.status === 'compromised' ? 'compromised' : ''}">
+                                            <span class="hw-icon">${node.icon}</span>
+                                            <span class="hw-name">${node.name}</span>
+                                            <span class="hw-tag ${node.status === 'origin' ? 'badge-amber' : node.status === 'compromised' ? 'badge-red' : 'badge-blue'}">${node.tag}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <div style="margin-top:14px; text-align:right;">
+                                <button class="btn-primary" onclick="advancePhase1()">
+                                    ${state.scenarioIdx < breachScenarios.length - 1 ? 'Next Breach Scenario →' : 'Launch Phase 2: Rapid Triage →'}
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function chooseMistake(idx) {
+            if (state.mistakeCorrect) return;
+            const sc = breachScenarios[state.scenarioIdx];
+            state.mistakeSelected = idx;
+            if (sc.mistakes[idx].correct) {
+                state.mistakeCorrect = true;
+                awardPoints(75, 'phase1');
+            } else {
+                breakStreak();
+            }
+            render();
+        }
+
+        function chooseThreat(idx) {
+            if (state.threatCorrect) return;
+            const sc = breachScenarios[state.scenarioIdx];
+            state.threatSelected = idx;
+            if (sc.threats[idx].correct) {
+                state.threatCorrect = true;
+                awardPoints(75, 'phase1');
+            } else {
+                breakStreak();
+            }
+            render();
+        }
+
+        function advancePhase1() {
+            if (state.scenarioIdx < breachScenarios.length - 1) {
+                state.scenarioIdx++;
+                resetScenarioStepState();
+                render();
+            } else {
+                state.view = 'phase2';
+                state.triageIdx = 0;
+                state.triageAnswered = false;
+                render();
+            }
+        }
+
+        // --- VIEW 3: PHASE 2 (RAPID-FIRE TRIAGE WITH OPTIONAL TIMER) ---
+        function renderPhase2(root) {
+            const item = triageAlerts[state.triageIdx];
+            state.timeLeft = 15;
+
+            root.innerHTML = `
+                <div class="animate-in">
+                    <div class="stage-header">
+                        <div>
+                            <h2 class="stage-title">Phase 2: "Spot the Weak Link" Rapid Triage</h2>
+                            <p style="font-size:0.82rem; color:var(--text-muted);">Classify each incoming threat alert into the correct cyber threat category.</p>
+                        </div>
+                        <span class="badge badge-teal">Alert ${state.triageIdx + 1} of ${triageAlerts.length}</span>
+                    </div>
+
+                    <!-- Timer Toggle Toolbar -->
+                    <div class="triage-toolbar">
+                        <label class="toggle-label">
+                            <input type="checkbox" ${state.timerEnabled ? 'checked' : ''} onchange="toggleTriageTimer(this.checked)">
+                            <span>Enable 15-Second Challenge Timer</span>
+                        </label>
+                        <div id="triage-timer-box">
+                            ${state.timerEnabled
+                                ? `<span id="timer-pill" class="timer-pill">⏱️ 15s</span>`
+                                : `<span class="badge badge-blue">Relaxed Mode (Untimed)</span>`
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Incoming Alert Card -->
+                    <div class="callout-box" style="border-left-color: var(--danger); background: #fff8f8;">
+                        <span class="badge badge-red" style="margin-bottom:6px;">🚨 LIVE SOC ALERT #${state.triageIdx + 1}</span>
+                        <p style="font-size:0.98rem; font-weight:700; color:#1e293b;">"${item.alert}"</p>
+                    </div>
+
+                    <!-- 4 Classification Buttons -->
+                    <div id="triage-options" class="category-grid">
+                        ${triageCategories.map(cat => `
+                            <button class="cat-btn" onclick="submitTriage('${cat.id}')">
+                                <span class="cat-title">${cat.id}</span>
+                                <span class="cat-sub">${cat.sub}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+
+                    <div id="triage-feedback"></div>
+                </div>
+            `;
+
+            if (state.timerEnabled && !state.triageAnswered) {
+                startTriageCountdown();
+            }
+        }
+
+        function toggleTriageTimer(enabled) {
+            state.timerEnabled = enabled;
+            if (!state.triageAnswered) {
+                render();
+            }
+        }
+
+        function startTriageCountdown() {
+            clearTriageTimer();
+            state.timeLeft = 15;
+            state.timerInterval = setInterval(() => {
+                state.timeLeft--;
+                const pill = document.getElementById('timer-pill');
+                if (pill) {
+                    pill.textContent = `⏱️ ${state.timeLeft}s`;
+                    if (state.timeLeft <= 5) pill.classList.add('urgent');
+                }
+                if (state.timeLeft <= 0) {
+                    clearTriageTimer();
+                    submitTriage(null, true);
+                }
+            }, 1000);
+        }
+
+        function submitTriage(chosenCategory, timedOut = false) {
+            if (state.triageAnswered) return;
+            state.triageAnswered = true;
+            clearTriageTimer();
+
+            const item = triageAlerts[state.triageIdx];
+            const isCorrect = !timedOut && chosenCategory === item.category;
+            let ptsTag = '';
+
+            if (isCorrect) {
+                const speedBonus = (state.timerEnabled && state.timeLeft >= 8) ? 20 : 0;
+                const { total } = awardPoints(100 + speedBonus, 'phase2');
+                ptsTag = `<span class="badge badge-teal">+${total} pts</span>`;
+            } else {
+                breakStreak();
+                ptsTag = `<span class="badge badge-red">0 pts</span>`;
+            }
+
+            // Disable category buttons
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.disabled = true;
+                const title = btn.querySelector('.cat-title').textContent;
+                if (title === item.category) {
+                    btn.style.borderColor = 'var(--accent)';
+                    btn.style.background = 'var(--accent-light)';
+                } else if (title === chosenCategory && !isCorrect) {
+                    btn.style.borderColor = 'var(--danger)';
+                    btn.style.background = 'var(--danger-light)';
+                }
+            });
+
+            const isLast = state.triageIdx >= triageAlerts.length - 1;
+            const fb = document.getElementById('triage-feedback');
+            fb.innerHTML = `
+                <div class="feedback-box ${isCorrect ? '' : 'warn-fb'} animate-in">
+                    <div class="feedback-header">
+                        <span>${timedOut ? `⏰ Time's up! Correct category: ${item.category}` : isCorrect ? '✅ Spot On!' : `❌ Classified as: ${item.category}`}</span>
+                        ${ptsTag}
+                    </div>
+                    <p class="feedback-text">${item.reason}</p>
+                    <button class="btn-primary" onclick="nextTriageAlert()">
+                        ${isLast ? 'View My Threat Analyst Certificate 🏆' : 'Next Alert →'}
+                    </button>
+                </div>
+            `;
+        }
+
+        function nextTriageAlert() {
+            if (state.triageIdx < triageAlerts.length - 1) {
+                state.triageIdx++;
+                state.triageAnswered = false;
+                render();
+            } else {
+                state.view = 'summary';
+                render();
+            }
+        }
+
+        // --- VIEW 4: CERTIFICATE & TEACHER SUMMARY ---
+        function renderSummary(root) {
+            let rank = 'Junior Threat Spotter';
+            let summaryMsg = 'Solid start! You have seen how everyday human habits affect network security—try replaying to beat your streak.';
+
+            if (state.score >= 1350) {
+                rank = 'Lead Ethical Threat Analyst';
+                summaryMsg = 'Outstanding! You brilliantly connected human behaviour to technical network threats across LAN hardware and the internet.';
+            } else if (state.score >= 950) {
+                rank = 'Senior Cyber Risk Auditor';
+                summaryMsg = 'Great work! You spotted how social engineering, weak passwords, and public Wi-Fi expose networks to attack.';
+            }
+
+            root.innerHTML = `
+                <div class="animate-in">
+                    <div class="cert-box">
+                        <div class="cert-medal" aria-hidden="true">🛡️</div>
+                        <span class="badge badge-blue">Oakridge Academy • Cyber Threat Audit Certificate</span>
+                        <h2 class="cert-rank">${rank}</h2>
+                        <p style="font-size:0.86rem; color:var(--text-muted); max-width:540px; margin:0 auto;">${summaryMsg}</p>
+
+                        <div class="stats-4">
+                            <div class="stat-tile">
+                                <span>Total Score</span>
+                                <strong>${state.score} pts</strong>
+                            </div>
+                            <div class="stat-tile">
+                                <span>Best Streak</span>
+                                <strong style="color:var(--warn);">${state.maxStreak} 🔥</strong>
+                            </div>
+                            <div class="stat-tile">
+                                <span>Breach Lab</span>
+                                <strong style="color:var(--primary);">${state.phase1Score} pts</strong>
+                            </div>
+                            <div class="stat-tile">
+                                <span>Rapid Triage</span>
+                                <strong style="color:var(--primary);">${state.phase2Score} pts</strong>
+                            </div>
+                        </div>
+
+                        <div style="background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:12px; max-width:600px; margin:0 auto; text-align:left; font-size:0.82rem;">
+                            <strong style="color:var(--primary); display:block; margin-bottom:4px;">Key Takeaways Mastered:</strong>
+                            <ul style="padding-left:18px; color:var(--text-main);">
+                                <li><strong>Human Mistakes:</strong> Phishing clicks, bait USB sticks, password reuse, unlocked screens, and public Wi-Fi logins.</li>
+                                <li><strong>Network Threats:</strong> Malware/Trojans, Ransomware, Brute-Force attacks, Data Interception, and Spyware.</li>
+                                <li><strong>Hardware Impact:</strong> How a single compromised workstation spreads threats via switches, routers, and file servers.</li>
+                            </ul>
+                        </div>
+
+                        <div id="copy-status"></div>
+                    </div>
+
+                    <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:12px;">
+                        <button class="btn-secondary" onclick="copyTeacherSummary('${rank}')">
+                            📋 Copy Summary for Teacher
+                        </button>
+                        <button class="btn-primary" onclick="restartSimulation()">
+                            ↻ Replay Mission
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function copyTeacherSummary(rank) {
+            const summaryText = `The Weakest Link: Cyber Threat Simulator — Completed! | Rank: ${rank} | Total Score: ${state.score} pts | Best Streak: ${state.maxStreak} | Phase 1 (Breach Lab): ${state.phase1Score} pts | Phase 2 (Rapid Triage): ${state.phase2Score} pts`;
+            
+            const tempInput = document.createElement('textarea');
+            tempInput.value = summaryText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            try {
+                document.execCommand('copy');
+                document.getElementById('copy-status').innerHTML = `<span class="copy-toast">✓ Summary copied to clipboard! Ready to paste into Canvas.</span>`;
+            } catch (err) {
+                document.getElementById('copy-status').innerHTML = `<span class="copy-toast">Screenshot this certificate to show your teacher!</span>`;
+            }
+            document.body.removeChild(tempInput);
+        }
+
+        function restartSimulation() {
+            state.view = 'intro';
+            state.score = 0;
+            state.streak = 0;
+            state.maxStreak = 0;
+            state.phase1Score = 0;
+            state.phase2Score = 0;
+            state.scenarioIdx = 0;
+            resetScenarioStepState();
+            state.triageIdx = 0;
+            state.triageAnswered = false;
+            render();
+        }
+
+        window.onload = function () {
+            render();
+        };
+    </script>
+</body>
+</html>
