@@ -799,17 +799,33 @@
             phase2Score: 0,
             // Phase 1 state
             scenarioIdx: 0,
+            shuffledMistakes: [],
+            shuffledThreats: [],
             mistakeSelected: null,
             mistakeCorrect: false,
             threatSelected: null,
             threatCorrect: false,
             // Phase 2 state
             triageIdx: 0,
+            shuffledCategories: [],
             triageAnswered: false,
             timerEnabled: true,
             timeLeft: 15,
             timerInterval: null
         };
+
+        /**
+         * Fisher-Yates shuffle helper to randomise option arrays cleanly
+         * without mutating the original scenario definitions.
+         */
+        function shuffleArray(items) {
+            const copy = [...items];
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [copy[i], copy[j]] = [copy[j], copy[i]];
+            }
+            return copy;
+        }
 
         // --- PHASE 1: 6 REALISTIC UK SCHOOL & STUDENT BREACH SCENARIOS ---
         const breachScenarios = [
@@ -1143,10 +1159,18 @@
         }
 
         function resetScenarioStepState() {
+            const sc = breachScenarios[state.scenarioIdx];
+            state.shuffledMistakes = shuffleArray(sc.mistakes);
+            state.shuffledThreats = shuffleArray(sc.threats);
             state.mistakeSelected = null;
             state.mistakeCorrect = false;
             state.threatSelected = null;
             state.threatCorrect = false;
+        }
+
+        function prepareTriageStepState() {
+            state.shuffledCategories = shuffleArray(triageCategories);
+            state.triageAnswered = false;
         }
 
         // --- VIEW 2: PHASE 1 (ANATOMY OF A BREACH) ---
@@ -1184,13 +1208,13 @@
                         </div>
                     </div>
 
-                    <!-- Two-Column Interactive Diagnosis -->
+                    <!-- Two-Column Interactive Diagnosis (Shuffled Options) -->
                     <div class="grid-2">
                         <!-- Step A: Human Mistake -->
                         <div class="step-box">
                             <span class="step-label">1. ${sc.mistakePrompt}</span>
                             <div class="options-stack">
-                                ${sc.mistakes.map((m, idx) => {
+                                ${state.shuffledMistakes.map((m, idx) => {
                                     let cls = 'opt-btn';
                                     let icon = '';
                                     if (state.mistakeSelected === idx) {
@@ -1214,7 +1238,7 @@
                         <div class="step-box">
                             <span class="step-label">2. ${sc.threatPrompt}</span>
                             <div class="options-stack">
-                                ${sc.threats.map((t, idx) => {
+                                ${state.shuffledThreats.map((t, idx) => {
                                     let cls = 'opt-btn';
                                     let icon = '';
                                     if (state.threatSelected === idx) {
@@ -1280,9 +1304,8 @@
 
         function chooseMistake(idx) {
             if (state.mistakeCorrect) return;
-            const sc = breachScenarios[state.scenarioIdx];
             state.mistakeSelected = idx;
-            if (sc.mistakes[idx].correct) {
+            if (state.shuffledMistakes[idx].correct) {
                 state.mistakeCorrect = true;
                 awardPoints(75, 'phase1');
             } else {
@@ -1293,9 +1316,8 @@
 
         function chooseThreat(idx) {
             if (state.threatCorrect) return;
-            const sc = breachScenarios[state.scenarioIdx];
             state.threatSelected = idx;
-            if (sc.threats[idx].correct) {
+            if (state.shuffledThreats[idx].correct) {
                 state.threatCorrect = true;
                 awardPoints(75, 'phase1');
             } else {
@@ -1312,7 +1334,7 @@
             } else {
                 state.view = 'phase2';
                 state.triageIdx = 0;
-                state.triageAnswered = false;
+                prepareTriageStepState();
                 render();
             }
         }
@@ -1320,6 +1342,9 @@
         // --- VIEW 3: PHASE 2 (RAPID-FIRE TRIAGE WITH OPTIONAL TIMER) ---
         function renderPhase2(root) {
             const item = triageAlerts[state.triageIdx];
+            if (!state.shuffledCategories.length) {
+                prepareTriageStepState();
+            }
             state.timeLeft = 15;
 
             root.innerHTML = `
@@ -1352,9 +1377,9 @@
                         <p style="font-size:0.98rem; font-weight:700; color:#1e293b;">"${item.alert}"</p>
                     </div>
 
-                    <!-- 4 Classification Buttons -->
+                    <!-- 4 Classification Buttons (Shuffled per Alert) -->
                     <div id="triage-options" class="category-grid">
-                        ${triageCategories.map(cat => `
+                        ${state.shuffledCategories.map(cat => `
                             <button class="cat-btn" onclick="submitTriage('${cat.id}')">
                                 <span class="cat-title">${cat.id}</span>
                                 <span class="cat-sub">${cat.sub}</span>
@@ -1445,7 +1470,7 @@
         function nextTriageAlert() {
             if (state.triageIdx < triageAlerts.length - 1) {
                 state.triageIdx++;
-                state.triageAnswered = false;
+                prepareTriageStepState();
                 render();
             } else {
                 state.view = 'summary';
@@ -1543,7 +1568,7 @@
             state.scenarioIdx = 0;
             resetScenarioStepState();
             state.triageIdx = 0;
-            state.triageAnswered = false;
+            prepareTriageStepState();
             render();
         }
 
